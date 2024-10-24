@@ -30,28 +30,103 @@ This is your best resource.  Remember it!
 (Make sure you are reading the most up to date version)
 We will be using Java to program the robots to keep things simple.  If you see a code example, sometimes you have to switch it to a Java view.
 
+## Side projects
+* Setup Kermit for driving
+* Telemetry
+* Camera data collection
+* Clean slate fork of 2024 competition code for 2025
+
+## FRC Robot Code Structure (Command-Based Java)
+All the robot base code is built from a set of libraries maintained by WPI (Worcester Polytechnic Institute).  The library handles the many small details of getting your robot to work with your team and allowing many teams to run robots together in a competition.
+
+* **Main.java** - DON'T CHANGE ANYTHING IN IT! :)  All this file does is start up an object called Robot.
+* **Robot.java** - This is responsible for the program’s control flow and should be mostly empty.  Notice how the names of the methods declared (autonomous, teleop, test) match the operations in the FRC Driver Station.  Two important points: the CommandScheduler.getInstance().run() call in the robotPeriodic() method is essential, and the teleopInit() method cancels any still-running autonomous commands.  Only advanced programmers should modify this file.
+* **RobotContainer.java** - Use this to define the basic capabilities of your robot - what the RoboRio is connected to and how to use those resources.  This is where you will bind commands to triggering events (such as buttons), and specify which command you will run in your autonomous routine.
+* **Constants.java** - Non-changing robot values (such as speeds, unit conversion factors, PID gains, and sensor/motor port numbers) are stored here.
+* **Subsystems** - These files encapsulate parts of the robot into easy to use software objects.  For instance, "Drivetrain" is usually used for moving the robot base around.  In your code, you just send the object a throttle and turning speed.
+* **Commands** - These files make it easy to group together sequences of robot actions.  For instance, driving up to the scoring station on the playing field and throwing in a ball.
+
+## Why do we need all this complexity?
+* Robot actions happen over time (raise the arm, move to a new spot), so act/wait looping is always there
+* Multiple actions need to occur at once (raise the arm, open the gripper, move forward)
+* If something is not working correctly, it is easy to isolate one action
+* Robot behavior needs to be changed quickly at competition
+
+## How commands work
+```mermaid
+stateDiagram-v2
+  direction LR
+  DriveToGoal-->RaiseElevator
+  RaiseElevator-->SetWristPosition
+  SetWristPosition-->ScoreBall
+```
+Commands let you break up the tasks of operating the robot into small chunks. Each command has an execute() method that does some work and an isFinished() method that tells if it is done. This happens on every update from the driver station or about every 20ms. Commands can be grouped together and executed sequentially, starting the next one in the group as the previous one finishes.
+
+## Concurrency
+```mermaid
+stateDiagram-v2
+  DriveToGoal-->CommandGroup
+  state CommandGroup{
+    SetWristPosition
+    RaiseElevator
+  }
+  CommandGroup-->ScoreBall
+```
+Sometimes it is desirable to have several operations happening concurrently. In the previous example you might want to set the wrist position while the elevator is moving up. In this case, a command group can start a parallel command (or command group) running.
+
+## How it works - Scheduling commands
+```mermaid
+stateDiagram-v2
+  s1: Wait for driver
+  if_new: New Command(s)?
+  state if_new <<choice>>
+  if_avail: Subsystem available?
+  state if_avail <<choice>>
+  if_int: Command interruptable?
+  state if_int <<choice>>
+  s1 --> if_new
+  if_new --> s1 : No
+  if_new --> if_avail : Yes
+  if_avail --> if_new : Yes - scheduled
+  if_avail --> if_int : No
+  if_int --> if_avail : Yes - interrupt
+  if_int --> if_new : No not scheduled
+```
+There are three main ways commands are scheduled:
+* Manually, by calling the start() method on the command (used for autonomous)
+* Automatically by the scheduler based on button/trigger actions specified in the code (typically defined in the OI class but checked by the Scheduler).
+* Automatically when a previous command completes (default commands and command groups).
+Each time the driver station gets new data, the periodic method of your robot program is called. It runs a Scheduler that checks the trigger conditions to see if any commands need to be scheduled or canceled.
+
+When a command is scheduled, the Scheduler checks to make sure that no other commands are using the same subsystems that the new command requires. If one or more of the subsystems is currently in use, and the current command is interruptible, it will be interrupted and the new command will be scheduled. If the current command is not interruptible, the new command will fail to be scheduled.
+
+## How It Works - Running Commands
+After checking for new commands, the scheduler proceeds through the list of active commands and calls the execute() and isFinished() methods on each command. Notice that the apparent concurrent execution is done without the use of threads or tasks which would add complexity to the program. Each command simply has some code to execute (execute method) to move it further along towards its goal and a method (isFinished) that determines if the command has reached the goal. The execute and isFinished methods are just called repeatedly.
+
+## Command Groups
+More complex commands can be built up from simpler commands. For example, shooting a disc may be a long sequence of commands that are executed one after another. Maybe some of these commands in the sequence can be executed concurrently. Command groups are commands, but instead of having an isFinished and execute method, they have a list of other commands to execute. This allows more complex operations to be built up out of simpler operations, a basic principle in programming. Each of the individual smaller commands can be easily tested first, then the group can be tested.
+
+## Overview of GitHub in VSCode
+[Overview video](https://www.youtube.com/watch?v=i_23KUAEtUM) <!-- 7 min -->
+
+If you want to learn more:
+* [Git in VSCode Documentation](https://code.visualstudio.com/docs/sourcecontrol/overview)
+
 ## Quick Start
-1. We will run through the simplest possible example.  This is not the type of programming that we will focus on, because it makes autonomous routines DIFFICULT, but it is a fast way to get the robot moving.
-2. Pull up [WPILib Example Projects: Basic Examples](https://docs.wpilib.org/en/stable/docs/software/examples-tutorials/wpilib-examples.html#basic-examples) in a separate tab.
-3. Take a quick look at the code by right-clicking on Arcade Drive "Java".
-4. After we discuss it, switch to VSCode.
-5. Type `Ctrl-Shift-P` (or push the little red hexagon with a W) and select `WPILib:Create a new project`.
-    * Select Example -> Java -> Arcade Drive.
-    * The base folder is your FRC2025 folder!
-    * Yes, create a new folder from the project name (your choice).
-    * Team Number: 8744 (This tells VSCode how to communicate with the robot!)
-    * Do **Not** enable desktop support.
-6. Edit Robot.java to use CAN communication for the SparkMax drivers:
-```
-  private CANSparkMax m_leftMotor = new CANSparkMax(xx, MotorType.kBrushless);
-  private CANSparkMax m_rightMotor = new CANSparkMax(xx, MotorType.kBrushless);
-```
-6. Hover the cursor over the errors and use "Quick Fix" to import the right libraries. (Let me know if this doesn't seem to work, we might have to import the REV motor library)
-7. If all errors and warnings are handled, download it to Thomas and give it a try.
-8. Turn on Thomas, but make sure the wheels are off the ground!
-9. Find Thomas' WiFi access point (called "8744_Radio_2") and connect to it. (you will temporarily lose Internet access)
-10. Make sure you have a joystick or controller connected to your laptop.
-11. Switch over to the Driver Station and attempt to burn carpet.
+1. We will go through the exercise of downloading last season's competition code from GitHub and programming it into the robot.
+2. Open VSCode.  If the "Welcome" page doesn't show up, select `File` -> `New Window`
+3. Click on "Clone Git repository"
+
+![Clone a repository](./Lesson00_visuals/VSC_clone_repo.png)
+
+4. Enter the URL of our competition code
+
+![Clone URL](./Lesson00_visuals/VSC_clone_URL.png)
+
+5. If we only have Miss Piggy, the URL is: https://github.com/FRC-Team8744/2024summer_Simple_Swivels
+6. Put the code in your FRC2025 folder.
+7. Have a look at the code (yes, it's a mess!)
+8. Take turns downloading the program to the robot. Verify it works. You will need a joystick!
 
 ### Further reading:
 * [Zero to Robot](https://docs.wpilib.org/en/stable/docs/zero-to-robot/introduction.html)
