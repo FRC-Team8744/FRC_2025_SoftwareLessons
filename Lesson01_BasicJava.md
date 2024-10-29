@@ -33,7 +33,7 @@ public final class Main {
 
 | Type | Storage Size | Value Range | Precision |
 | --- | --- | --- | --- | 
-| byte | 1 byte | 2^8^ or [-128, 127] | |
+| byte | 1 byte | 2<sup>8</sup> or [-128, 127] | |
 | short | 2 byte | 2<sup>16</sup> or [-32768, 32767] | |
 | int | 4 byte | 2<sup>32</sup> or [-2147483648, 2147483647] | Over 2 billion |
 | long | 8 byte | 2<sup>64</sup> or [-9223372036854775808, 9,223,372,036,854,775,807] | Over 9 Quintillion! (10<sup>18</sup> or exa) |
