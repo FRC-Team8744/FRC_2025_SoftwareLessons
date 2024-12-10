@@ -1,4 +1,4 @@
-# Lesson 5: Servo control using PID
+# Lesson 4: Servo control using PID
 
 ## Introduction to electronic control systems
 Have you ever wondered how your home thermostat keeps the temperature comfortable?  How does a remote controlled car know what direction to steer?  These are generally called control systems - you set a goal for the system, and it tries to hold that goal.  How?
